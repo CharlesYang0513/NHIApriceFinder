@@ -22,7 +22,9 @@ if st.button("查詢並下載 Excel") and drug_name:
         "INGR_NAME": drug_name,
         "qryFlag": "true"
     }
-
+search = driver.find_element(By.CSS_SELECTOR, '[title="成分名稱"]')
+search.send_keys(DrugName)
+search.send_keys(Keys.RETURN)
     try:
         response = requests.post(url, headers=headers, data=payload, timeout=10)
         response.encoding = "utf-8"
