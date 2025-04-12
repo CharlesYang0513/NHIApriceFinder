@@ -1,62 +1,51 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Apr  3 16:24:48 2025
-
+Created on Mon Mar 31 22:35:14 2025
 @author: flysk
 """
 
-import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from io import BytesIO
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
 
-st.title("健保署藥品查詢工具（自動儲存 Excel）")
+# 讓使用者輸入藥品成分
+DrugName = input("請輸入藥品成分: ")
 
-drug_name = st.text_input("請輸入藥品成分名稱（如 bisoprolol）")
+# 設定 ChromeDriver 路徑與下載資料夾
+PATH = r"C:\Users\flysk\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe"
+download_path = r"C:\Users\flysk\Downloads"
 
-if st.button("查詢並下載 Excel") and drug_name:
-    url = "https://info.nhi.gov.tw/INAE3000/INAE3000S01"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    payload = {
-        "INGR_NAME": drug_name,
-        "qryFlag": "true"
-    }
-search = driver.find_element(By.CSS_SELECTOR, '[title="成分名稱"]')
-search.send_keys(DrugName)
-search.send_keys(Keys.RETURN)
-    try:
-        response = requests.post(url, headers=headers, data=payload, timeout=10)
-        response.encoding = "utf-8"
-        soup = BeautifulSoup(response.text, "html.parser")
+options = webdriver.ChromeOptions()
+prefs = {"download.default_directory": download_path}
+options.add_experimental_option("prefs", prefs)
 
-        table = soup.find("div", class_="table-responsive")
-        if not table:
-            st.warning("查無資料，請確認藥品成分名稱拼寫正確。")
-        else:
-            rows = table.find_all("tr")
-            data = [  # 擷取資料列
-                [td.text.strip() for td in row.find_all("td")]
-                for row in rows[1:]
-            ]
-            headers = [th.text.strip() for th in rows[0].find_all("th")]
-            df = pd.DataFrame(data, columns=headers)
+# 啟動瀏覽器
+service = Service(PATH)
+driver = webdriver.Chrome(service=service, options=options)
 
-            st.success("查詢成功！以下為查詢結果：")
-            st.dataframe(df)
+driver.get("https://info.nhi.gov.tw/INAE3000/INAE3000S01")
 
-            # 轉換為 Excel 並提供下載
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='查詢結果')
-            output.seek(0)
+# 等待輸入框出現，然後輸入
+try:
+    wait = WebDriverWait(driver, 10)
+    search = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[title="成分名稱"]')))
+    search.send_keys(DrugName)
+    search.send_keys(Keys.RETURN)
 
-            st.download_button(
-                label="點此下載 Excel 檔案",
-                data=output,
-                file_name=f"{drug_name}_查詢結果.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+    # 等待頁面載入資料與下載按鈕出現
+    download = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '.btn-download')))
+    time.sleep(1)  # 保險再等一點
+    download.click()
 
-    except Exception as e:
-        st.error(f"查詢失敗：{e}")
+    print("✅ 已點擊下載按鈕。請等待檔案下載...")
+    time.sleep(5)  # 等檔案下載（視檔案大小可加長）
+
+except Exception as e:
+    print("⚠ 發生錯誤：", e)
+
+finally:
+    driver.quit()
